@@ -1,0 +1,1461 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+  <declaration>// Place global declarations here.
+// representing colors of cube
+// we have 2 representations because a lot of scrambled cube setups in the arrays below were generated with only the initials
+const int RED = 0, YELLOW = 1, BLUE = 2, GREEN = 3, WHITE = 4, ORANGE = 5;
+const int R = 0, Y = 1, B = 2, G = 3, W = 4, O = 5;
+// ints representing moves to check last move
+const int FRONT = 0, FRONT_PRIME = 1, BACK = 2, BACK_PRIME = 3, UP = 4, UP_PRIME = 5, DOWN = 6, DOWN_PRIME = 7, LEFT = 8, LEFT_PRIME = 9, RIGHT = 10, RIGHT_PRIME = 11;
+const int CORNER_INSERT = 12, EDGE_INSERT = 13, YELLOW_CROSS_SOLVE = 14, YELLOW_FACE_SOLVE = 15, YELLOW_CORNER_SOLVE = 16, YELLOW_EDGE_SOLVE = 17;
+// init these 2 outside the possible moves because no moves have been done
+int last_move = 12;
+int second_last_move = 12;
+// x == turn count
+int x;
+const int turns = 12;
+// some colors that are used to select which block to solve. also sides that are allowed to turn
+int color1;
+int color2;
+int corner_found_at;
+bool corner_hidden;
+// flags keeping track of what is currently solved
+int flag_mark = 997;
+// 0 = white edge blue
+// 1 = white edge red
+// 2 = white edge green
+// 3 = white cross
+// 4 = white corner green orange
+// 5 = white corner red green
+// 6 = white corner orange blue
+// 7 = white face
+// 8 = green orange edge
+// 9 = red green edge
+// 10 = orange blue edge
+// 11 = second layer
+// 12 = yellow cross
+// 13 = yellow face
+// 14 = yellow corners
+// 15 = fully solved
+int flags[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+// arrays that represent the faces of the cube
+int cube_mark = 998;
+int front_face[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int back_face[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int right_face[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int left_face[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int up_face[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int down_face[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+////
+// below i a setup that the python file uses, it is in here for me to copy and manually reset this script to a state that the py solver can use.
+//int flags/[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+//int front_/face[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+//int back_fa/ce[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+//int right_fa/ce[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+//int left_face/[9] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+//int up_face[9]/ = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+//int down_face[9/] = {-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int move_mark = 999;
+int i = 0;
+int moves[1000];
+int temp[21];
+typedef int[0,0] cube;
+</declaration>
+  <template>
+    <name x="5" y="5">Cube</name>
+    <parameter>cube me</parameter>
+    <declaration>// Place local declarations here.
+// bool functions to check if the cube is solved
+bool front_face_solved() {
+    return 
+        front_face[0] == front_face[1] &amp;&amp;
+        front_face[1] == front_face[2] &amp;&amp;
+        front_face[2] == front_face[3] &amp;&amp;
+        front_face[3] == front_face[4] &amp;&amp;
+        front_face[4] == front_face[5] &amp;&amp;
+        front_face[5] == front_face[6] &amp;&amp;
+        front_face[6] == front_face[7] &amp;&amp;
+        front_face[7] == front_face[8];
+}
+bool right_face_solved() {
+    return 
+        right_face[0] == right_face[1] &amp;&amp;
+        right_face[1] == right_face[2] &amp;&amp;
+        right_face[2] == right_face[3] &amp;&amp;
+        right_face[3] == right_face[4] &amp;&amp;
+        right_face[4] == right_face[5] &amp;&amp;
+        right_face[5] == right_face[6] &amp;&amp;
+        right_face[6] == right_face[7] &amp;&amp;
+        right_face[7] == right_face[8];
+}
+bool left_face_solved() {
+    return 
+        left_face[0] == left_face[1] &amp;&amp;
+        left_face[1] == left_face[2] &amp;&amp;
+        left_face[2] == left_face[3] &amp;&amp;
+        left_face[3] == left_face[4] &amp;&amp;
+        left_face[4] == left_face[5] &amp;&amp;
+        left_face[5] == left_face[6] &amp;&amp;
+        left_face[6] == left_face[7] &amp;&amp;
+        left_face[7] == left_face[8];
+}
+bool down_face_solved() {
+    return 
+        down_face[0] == down_face[1] &amp;&amp;
+        down_face[1] == down_face[2] &amp;&amp;
+        down_face[2] == down_face[3] &amp;&amp;
+        down_face[3] == down_face[4] &amp;&amp;
+        down_face[4] == down_face[5] &amp;&amp;
+        down_face[5] == down_face[6] &amp;&amp;
+        down_face[6] == down_face[7] &amp;&amp;
+        down_face[7] == down_face[8];
+}
+bool back_face_solved() {
+    return 
+        back_face[0] == back_face[1] &amp;&amp;
+        back_face[1] == back_face[2] &amp;&amp;
+        back_face[2] == back_face[3] &amp;&amp;
+        back_face[3] == back_face[4] &amp;&amp;
+        back_face[4] == back_face[5] &amp;&amp;
+        back_face[5] == back_face[6] &amp;&amp;
+        back_face[6] == back_face[7] &amp;&amp;
+        back_face[7] == back_face[8];
+}
+bool up_face_solved() {
+    return 
+        up_face[0] == up_face[1] &amp;&amp;
+        up_face[1] == up_face[2] &amp;&amp;
+        up_face[2] == up_face[3] &amp;&amp;
+        up_face[3] == up_face[4] &amp;&amp;
+        up_face[4] == up_face[5] &amp;&amp;
+        up_face[5] == up_face[6] &amp;&amp;
+        up_face[6] == up_face[7] &amp;&amp;
+        up_face[7] == up_face[8];
+}
+bool fully_solved_check() {
+    return up_face_solved() &amp;&amp;
+    down_face_solved() &amp;&amp;
+    right_face_solved() &amp;&amp;
+    left_face_solved() &amp;&amp;
+    front_face_solved() &amp;&amp;
+    back_face_solved(); 
+}
+bool white_blue_solved() {
+    return up_face[5] == WHITE &amp;&amp; right_face[1] == BLUE;
+}
+bool white_red_solved() {
+    return up_face[7] == WHITE &amp;&amp; front_face[1] == RED;
+}
+bool white_green_solved() {
+    return up_face[3] == WHITE &amp;&amp; left_face[1] == GREEN;
+}
+bool white_cross_solved() {
+    return up_face[1] == WHITE &amp;&amp; back_face[1] == ORANGE &amp;&amp; white_green_solved() &amp;&amp; white_red_solved() &amp;&amp; white_blue_solved();
+}
+bool green_orange_corner_solved() {
+    return up_face[0] == WHITE &amp;&amp; left_face[0] == GREEN &amp;&amp; back_face[2] == ORANGE;
+}
+bool red_green_corner_solved() {
+    return up_face[6] == WHITE &amp;&amp; front_face[0] == RED &amp;&amp; left_face[2] == GREEN;
+}
+bool orange_blue_corner_solved() {
+    return up_face[2] == WHITE &amp;&amp; right_face[2] == BLUE &amp;&amp; back_face[0] == ORANGE;
+}
+bool green_orange_edge_solved() {
+    return left_face[3] == GREEN &amp;&amp; back_face[5] == ORANGE;
+}
+bool red_green_edge_solved() {
+    return front_face[3] == RED &amp;&amp; left_face[5] == GREEN;
+}
+bool orange_blue_edge_solved() {
+    return back_face[3] == ORANGE &amp;&amp; right_face[5] == BLUE;
+}
+bool second_layer_solved() {
+    return right_face[3] == BLUE &amp;&amp; front_face[5] == RED; 
+}
+bool yellow_cross_solved() {
+    return down_face[1] == YELLOW &amp;&amp; down_face[3] == YELLOW &amp;&amp; down_face[5] == YELLOW &amp;&amp; down_face[7] == YELLOW;
+}
+bool yellow_face_solved() {
+    return yellow_cross_solved() &amp;&amp; down_face[0] == YELLOW &amp;&amp; down_face[2] == YELLOW &amp;&amp; down_face[6] == YELLOW &amp;&amp; down_face[8] == YELLOW;
+}
+bool three_yellow_corners() {
+    return 
+        front_face[6] == RED &amp;&amp; 
+        front_face[8] == RED &amp;&amp; 
+        right_face[6] == BLUE &amp;&amp; 
+        right_face[8] == BLUE &amp;&amp; 
+        left_face[6] == GREEN &amp;&amp; 
+        left_face[8] == GREEN;
+}
+bool yellow_corners_solved() {
+    return yellow_face_solved() &amp;&amp; three_yellow_corners() &amp;&amp; back_face[6] == ORANGE &amp;&amp; back_face[8] == ORANGE;
+}
+void increase_x() {
+    x = x + 1;
+    i = i + 1;
+}
+void store_move(int move) {
+    if (move &lt; 12) {
+        moves[i] = move;
+    }
+}
+// void decrease_x() {
+//     x = x - 1;
+// }
+int side_prime(int side) {
+    if (side == FRONT) {
+        return FRONT_PRIME;
+    }
+    if (side == BACK) {
+        return BACK_PRIME;
+    }
+    if (side == RIGHT) {
+        return RIGHT_PRIME;
+    }
+    if (side == LEFT) {
+        return LEFT_PRIME;
+    }
+    if (side == UP) {
+        return UP_PRIME;
+    }
+    if (side == DOWN) {
+        return DOWN_PRIME;
+    }
+    return 0;
+}
+int color_side(int color) {
+    int temp_side;
+    if (color == WHITE) {
+        temp_side = UP;
+    }
+    if (color == RED) {
+        temp_side = FRONT;
+    }
+    if (color == BLUE) {
+        temp_side = RIGHT;
+    }
+    if (color == GREEN) {
+        temp_side = LEFT;
+    }
+    if (color == ORANGE) {
+        temp_side = BACK;
+    }
+    if (color == YELLOW) {
+        temp_side = DOWN;
+    }
+    return temp_side;
+}
+// updates to do moves on the cube
+void move_up() {
+    // fill the temp array with the colors and then reassign the colors in the cube
+    int i = 0;
+    for (i = 0; i &lt; 9; i++) {
+        temp[i] = up_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 9] = front_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 12] = right_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 15] = back_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 18] = left_face[i];
+    }
+    up_face[0] = temp[6];
+    up_face[1] = temp[3];
+    up_face[2] = temp[0];
+    up_face[3] = temp[7];
+    up_face[5] = temp[1];
+    up_face[6] = temp[8];
+    up_face[7] = temp[5];
+    up_face[8] = temp[2];
+    left_face[0] = temp[9];
+    left_face[1] = temp[10];
+    left_face[2] = temp[11];
+    front_face[0] = temp[12];
+    front_face[1] = temp[13];
+    front_face[2] = temp[14];
+    right_face[0] = temp[15];
+    right_face[1] = temp[16];
+    right_face[2] = temp[17];
+    back_face[0] = temp[18];
+    back_face[1] = temp[19];
+    back_face[2] = temp[20];
+}
+void move_up_prime() {
+    move_up();
+    move_up();
+    move_up();
+}
+void move_down() {
+    // fill the temp array with the colors and then reassign the colors in the cube
+    int i = 0;
+    for (i = 0; i &lt; 9; i++) {
+        temp[i] = down_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 9] = front_face[i + 6];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 12] = right_face[i + 6];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 15] = back_face[i + 6];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 18] = left_face[i + 6];
+    }
+    down_face[0] = temp[6];
+    down_face[1] = temp[3];
+    down_face[2] = temp[0];
+    down_face[3] = temp[7];
+    down_face[5] = temp[1];
+    down_face[6] = temp[8];
+    down_face[7] = temp[5];
+    down_face[8] = temp[2];
+    right_face[6] = temp[9];
+    right_face[7] = temp[10];
+    right_face[8] = temp[11];
+    back_face[6] = temp[12];
+    back_face[7] = temp[13];
+    back_face[8] = temp[14];
+    left_face[6] = temp[15];
+    left_face[7] = temp[16];
+    left_face[8] = temp[17];
+    front_face[6] = temp[18];
+    front_face[7] = temp[19];
+    front_face[8] = temp[20];
+}
+void move_down_prime() {
+    move_down();
+    move_down();
+    move_down();
+}
+void move_right() {
+    // fill the temp array with the colors and then reassign the colors in the cube
+    int i = 0;
+    for (i = 0; i &lt; 9; i++) {
+        temp[i] = right_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 9] = front_face[(i*3) + 2];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 12] = down_face[i*3 + 2];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 15] = back_face[i*3];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 18] = up_face[i*3+2];
+    }
+    right_face[0] = temp[6];
+    right_face[1] = temp[3];
+    right_face[2] = temp[0];
+    right_face[3] = temp[7];
+    right_face[5] = temp[1];
+    right_face[6] = temp[8];
+    right_face[7] = temp[5];
+    right_face[8] = temp[2];
+    up_face[2] = temp[9];
+    up_face[5] = temp[10];
+    up_face[8] = temp[11];
+    front_face[2] = temp[12];
+    front_face[5] = temp[13];
+    front_face[8] = temp[14];
+    down_face[8] = temp[15];
+    down_face[5] = temp[16];
+    down_face[2] = temp[17];
+    back_face[6] = temp[18];
+    back_face[3] = temp[19];
+    back_face[0] = temp[20];
+}
+void move_right_prime() {
+    move_right();
+    move_right();
+    move_right();
+}
+void move_left() {
+    // fill the temp array with the colors and then reassign the colors in the cube
+    int i = 0;
+    for (i = 0; i &lt; 9; i++) {
+        temp[i] = left_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 9] = front_face[i * 3];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 12] = up_face[i * 3];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 15] = back_face[i * 3 + 2];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 18] = down_face[i * 3];
+    }
+    left_face[0] = temp[6];
+    left_face[1] = temp[3];
+    left_face[2] = temp[0];
+    left_face[3] = temp[7];
+    left_face[5] = temp[1];
+    left_face[6] = temp[8];
+    left_face[7] = temp[5];
+    left_face[8] = temp[2];
+    down_face[0] = temp[9];
+    down_face[3] = temp[10];
+    down_face[6] = temp[11];
+    front_face[0] = temp[12];
+    front_face[3] = temp[13];
+    front_face[6] = temp[14];
+    up_face[6] = temp[15];
+    up_face[3] = temp[16];
+    up_face[0] = temp[17];
+    back_face[8] = temp[18];
+    back_face[5] = temp[19];
+    back_face[2] = temp[20];
+}
+void move_left_prime() {
+    move_left();
+    move_left();
+    move_left();
+}
+void move_front() {
+    // fill the temp array with the colors and then reassign the colors in the cube
+    int i = 0;
+    for (i = 0; i &lt; 9; i++) {
+        temp[i] = front_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 9] = up_face[i+6];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 12] = right_face[i*3];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 15] = down_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 18] = left_face[i*3+2];
+    }
+    front_face[0] = temp[6];
+    front_face[1] = temp[3];
+    front_face[2] = temp[0];
+    front_face[3] = temp[7];
+    front_face[5] = temp[1];
+    front_face[6] = temp[8];
+    front_face[7] = temp[5];
+    front_face[8] = temp[2];
+    right_face[0] = temp[9];
+    right_face[3] = temp[10];
+    right_face[6] = temp[11];
+    down_face[2] = temp[12];
+    down_face[1] = temp[13];
+    down_face[0] = temp[14];
+    left_face[2] = temp[15];
+    left_face[5] = temp[16];
+    left_face[8] = temp[17];
+    up_face[8] = temp[18];
+    up_face[7] = temp[19];
+    up_face[6] = temp[20];
+}
+void move_front_prime() {
+    move_front();
+    move_front();
+    move_front();
+}
+void move_back() {
+    // fill the temp array with the colors and then reassign the colors in the cube
+    int i = 0;
+    for (i = 0; i &lt; 9; i++) {
+        temp[i] = back_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 9] = up_face[i];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 12] = right_face[i * 3 + 2];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 15] = down_face[i + 6];
+    }
+    for (i = 0; i &lt; 3; i++) {
+        temp[i + 18] = left_face[i * 3];
+    }
+    back_face[0] = temp[6];
+    back_face[1] = temp[3];
+    back_face[2] = temp[0];
+    back_face[3] = temp[7];
+    back_face[5] = temp[1];
+    back_face[6] = temp[8];
+    back_face[7] = temp[5];
+    back_face[8] = temp[2];
+    left_face[6] = temp[9];
+    left_face[3] = temp[10];
+    left_face[0] = temp[11];
+    up_face[0] = temp[12];
+    up_face[1] = temp[13];
+    up_face[2] = temp[14];
+    right_face[8] = temp[15];
+    right_face[5] = temp[16];
+    right_face[2] = temp[17];
+    down_face[6] = temp[18];
+    down_face[7] = temp[19];
+    down_face[8] = temp[20];
+}
+void move_back_prime() {
+    move_back();
+    move_back();
+    move_back();
+}
+void move(int move) {
+    if (move == FRONT) {
+        move_front();
+    }
+    if (move == FRONT_PRIME) {
+        move_front_prime();
+    }
+    if (move == BACK) {
+        move_back();
+    }
+    if (move == BACK_PRIME) {
+        move_back_prime();
+    }
+    if (move == LEFT) {
+        move_left();
+    }
+    if (move == LEFT_PRIME) {
+        move_left_prime();
+    }
+    if (move == RIGHT) {
+        move_right();
+    }
+    if (move == RIGHT_PRIME) {
+        move_right_prime();
+    }
+    if (move == UP) {
+        move_up();
+    }
+    if (move == UP_PRIME) {
+        move_up_prime();
+    }
+    if (move == DOWN) {
+        move_down();
+    }
+    if (move == DOWN_PRIME) {
+        move_down_prime();
+    }
+}
+// algorithm moves below
+// corner insert
+// select the next corner to solve
+// also set the side where the pieces need to go
+// code that is used to go from white cross to white face
+// check if a white corner is in the bottom row
+void white_corner_hidden() {
+    if (up_face[0] == WHITE || up_face[0] == color1 || up_face[0] == color2) {
+        if ((left_face[0] == color1 || left_face[0] == color2 || left_face[0] == WHITE ) &amp;&amp; (back_face[2] == color2 || back_face[2] == color1 || back_face[2] == WHITE)) {
+            corner_found_at = 0;
+            corner_hidden = true;
+            color1 = GREEN;
+            color2 = ORANGE;
+        }
+    }
+    if (up_face[2] == WHITE || up_face[2] == color1 || up_face[2] == color2) {
+        if ((back_face[0] == color1 || back_face[0] == color2 || back_face[0] == WHITE) &amp;&amp; (right_face[2] == color2 || right_face[2] == color1 || right_face[2] == WHITE)) {
+            corner_found_at = 2;
+            corner_hidden = true;
+            color1 = ORANGE;
+            color2 = BLUE;
+        }
+    }
+    if (up_face[6] == WHITE || up_face[6] == color1 || up_face[6] == color2) {
+        if ((front_face[0] == color1 || front_face[0] == color2 || front_face[0] == WHITE) &amp;&amp; (left_face[2] == color2 || left_face[2] == color1 || left_face[2] == WHITE)) {
+            corner_found_at = 6;
+            corner_hidden = true;
+            color1 = RED;
+            color2 = GREEN;
+        }
+    }
+    if (up_face[8] == WHITE || up_face[8] == color1 || up_face[8] == color2) {
+        if ((right_face[0] == color1 || right_face[0] == color2 || right_face[0] == WHITE) &amp;&amp; (front_face[2] == color2 || front_face[2] == color1 || front_face[2] == WHITE)) {
+            corner_found_at = 8;
+            corner_hidden = true;
+            color1 = BLUE;
+            color2 = RED;
+        }
+    }
+}
+void select_white_corner() {
+    if (flags[4] == 0) {
+        color1 = GREEN;
+        color2 = ORANGE;
+        return;
+    }
+    if (flags[5] == 0) {
+        color1 = RED;
+        color2 = GREEN;
+        return;
+    }
+    if (flags[6] == 0) {
+        color1 = ORANGE;
+        color2 = BLUE;
+        return;
+    }
+    if (flags[7] == 0) {
+        color1 = BLUE;
+        color2 = RED;
+        return;
+    }
+}
+void corner_insert(bool reverse) {   
+    select_white_corner();
+    white_corner_hidden();
+    if (reverse) {
+        int side = color_side(color1);
+        move(side_prime(side));
+        store_move(side_prime(side));
+        i = i + 1;
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+        move(side);
+        store_move(side);
+        // i = i + 1;
+    }
+    else {
+        int side = color_side(color2);
+        move(side);
+        store_move(side);
+        i = i + 1;
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+        move(side_prime(side));
+        store_move(side_prime(side));
+        // i = i + 1;
+    }
+}
+bool is_allowed_corner_insert() {
+    return flags[3] == 1 &amp;&amp; flags[7] == 0;
+}
+bool is_allowed_edge_insert() {
+    return flags[7] == 1 &amp;&amp; flags[11] == 0;
+}
+void select_edge() {
+    if (flags[8] == 0) {
+        color1 = GREEN;
+        color2 = ORANGE;
+        return;
+    }
+    if (flags[9] == 0) {
+        color1 = RED;
+        color2 = GREEN;
+        return;
+    }
+    if (flags[10] == 0) {
+        color1 = ORANGE;
+        color2 = BLUE;
+        return;
+    }
+    if (flags[11] == 0) {
+        color1 = BLUE;
+        color2 = RED;
+        return;
+    }
+}
+void edge_hidden() {
+    if ((front_face[5] == color1 || front_face[5] == color2) &amp;&amp; (right_face[3] == color1 || right_face[3] == color2)) {
+        color1 = BLUE;
+        color2 = RED;
+        return;
+    }
+    if ((right_face[5] == color1 || right_face[5] == color2) &amp;&amp; (back_face[3] == color1 || back_face[3] == color2)) {
+        color1 = ORANGE;
+        color2 = BLUE;
+        return;
+    }
+    if ((back_face[5] == color1 || back_face[5] == color2) &amp;&amp; (left_face[3] == color1 || left_face[3] == color2)) {
+        color1 = GREEN;
+        color2 = ORANGE;
+        return;
+    }
+    if ((left_face[5] == color1 || left_face[5] == color2) &amp;&amp; (front_face[3] == color1 || front_face[3] == color2)) {
+        color1 = RED;
+        color2 = GREEN;
+        return;
+    }
+    return;
+}
+void edge_insert(bool reverse) {
+    select_edge();
+    edge_hidden();
+    if (reverse) {
+        int side1 = color_side(color1);
+        int side2 = color_side(color2);
+        move(side_prime(side1));
+        store_move(side_prime(side1));
+        i = i + 1;
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+        move(side1);
+        store_move(side1);
+        i = i + 1;
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+        move(side2);
+        store_move(side2);
+        i = i + 1;
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+        move(side_prime(side2));
+        store_move(side_prime(side2));
+    }
+    else {
+        int side1 = color_side(color1); //blue
+        int side2 = color_side(color2); //red
+        move(side2);
+        store_move(side2);
+        i = i + 1;
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+        move(side_prime(side2));
+        store_move(side_prime(side2));
+        i = i + 1;
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+        move(side_prime(side1));
+        store_move(side_prime(side1));
+        i = i + 1;
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+        move(side1);
+        store_move(side1);
+    }
+}
+bool is_allowed_yellow_cross_solve() {
+    return flags[11] == 1 &amp;&amp; flags[12] == 0;
+}
+void yellow_cross_solve(bool reverse) {
+    if (reverse) {
+        move(FRONT);
+        store_move(FRONT);
+        i = i + 1;
+        move(LEFT);
+        store_move(LEFT);
+        i = i + 1;
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+        move(LEFT_PRIME);
+        store_move(LEFT_PRIME);
+        i = i + 1;
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+        move(FRONT_PRIME);
+        store_move(FRONT_PRIME);
+        //i = i + 1;
+    }
+    else {
+        move(FRONT);
+        store_move(FRONT);
+        i = i + 1;
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+        move(LEFT);
+        store_move(LEFT);
+        i = i + 1;
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+        move(LEFT_PRIME);
+        store_move(LEFT_PRIME);
+        i = i + 1;
+        move(FRONT_PRIME);
+        store_move(FRONT_PRIME);
+        //i = i + 1;
+    }
+}
+void yellow_face_solve() {
+    move(LEFT);
+    store_move(LEFT);
+    i = i + 1;
+    move(DOWN);
+    store_move(DOWN);
+    i = i + 1;
+    move(LEFT_PRIME);
+    store_move(LEFT_PRIME);
+    i = i + 1;
+    move(DOWN);
+    store_move(DOWN);
+    i = i + 1;
+    move(LEFT);
+    store_move(LEFT);
+    i = i + 1;
+    move(DOWN);
+    store_move(DOWN);
+    i = i + 1;
+    move(DOWN);
+    store_move(DOWN);
+    i = i + 1;
+    move(LEFT_PRIME);
+    store_move(LEFT_PRIME);
+    //i = i + 1;
+}
+bool is_allowed_yellow_face_solve() {
+    return flags[12] == 1 &amp;&amp; flags[13] == 0;
+}
+void yellow_corner_solve() {
+    move(LEFT);
+    store_move(LEFT);
+    i = i + 1;
+    move(FRONT);
+    store_move(FRONT);
+    i = i + 1;
+    move(LEFT_PRIME);
+    store_move(LEFT_PRIME);
+    i = i + 1;
+    move(BACK);
+    store_move(BACK);
+    i = i + 1;
+    move(BACK);
+    store_move(BACK);
+    i = i + 1;
+    move(LEFT);
+    store_move(LEFT);
+    i = i + 1;
+    move(FRONT_PRIME);
+    store_move(FRONT_PRIME);
+    i = i + 1;
+    move(LEFT_PRIME);
+    store_move(LEFT_PRIME);
+    i = i + 1;
+    move(BACK);
+    store_move(BACK);
+    i = i + 1;
+    move(BACK);
+    store_move(BACK);
+    i = i + 1;
+    move(LEFT);
+    store_move(LEFT);
+    i = i + 1;
+    move(LEFT);
+    store_move(LEFT);
+    //i = i + 1;
+}
+bool is_allowed_yellow_corner_solve() {
+    return flags[13] == 1 &amp;&amp; flags[14] == 0;
+}
+void yellow_edge_solve(bool reverse) {
+    move(FRONT);
+    store_move(FRONT);
+    i = i + 1;
+    move(FRONT);
+    store_move(FRONT);
+    i = i + 1;
+    if (reverse) {
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+    }
+    else {
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+    }
+    move(RIGHT);
+    store_move(RIGHT);
+    i = i + 1;
+    move(LEFT_PRIME);
+    store_move(LEFT_PRIME);
+    i = i + 1;
+    move(FRONT);
+    store_move(FRONT);
+    i = i + 1;
+    move(FRONT);
+    store_move(FRONT);
+    i = i + 1;
+    move(RIGHT_PRIME);
+    store_move(RIGHT_PRIME);
+    i = i + 1;
+    move(LEFT);
+    store_move(LEFT);
+    i = i + 1;
+    if (reverse) {
+        move(DOWN_PRIME);
+        store_move(DOWN_PRIME);
+        i = i + 1;
+    }
+    else {
+        move(DOWN);
+        store_move(DOWN);
+        i = i + 1;
+    }
+    move(FRONT);
+    store_move(FRONT);
+    i = i + 1;
+    move(FRONT);
+    store_move(FRONT);
+    //i = i + 1;
+}
+bool is_allowed_yellow_edge_solve() {
+    return flags[14] == 1 &amp;&amp; flags[15] == 0;
+}
+// state space reduction by disallowing certain moves
+void update_last_move(int move) {
+    second_last_move = last_move;
+    last_move = move;
+    store_move(move);
+}
+bool already_moved_twice(int move) {
+    return last_move == move &amp;&amp; second_last_move == move;
+}
+bool is_allowed_f() {
+    return last_move != FRONT_PRIME &amp;&amp; !already_moved_twice(FRONT);
+}
+bool is_allowed(int move, int move_prime) {
+    if (flags[3] == 0) {  
+        return last_move != move_prime &amp;&amp; !already_moved_twice(move) &amp;&amp; (move != UP) &amp;&amp; (move != UP_PRIME);
+    }
+    if (flags[15] == 0) {
+        return last_move != move_prime &amp;&amp; !already_moved_twice(move) &amp;&amp; (move == DOWN || move == DOWN_PRIME);
+    }
+    return false;
+}
+bool keep_progress() {
+    if (flags[0] == 1) {
+        if (!white_blue_solved()) {
+            return false;
+        }
+    }
+    if (flags[1] == 1) {
+        if (!white_red_solved()) {
+            return false;
+        }
+    } 
+    if (flags[2] == 1) {
+        if (!white_green_solved()) {
+            return false;
+        }
+    } 
+    if (flags[3] == 1) {
+        if (!white_cross_solved()) {
+            return false;
+        }
+    }
+    if (flags[4] == 1) {
+        if (!green_orange_corner_solved()) {
+            return false;
+        }
+    }
+    if (flags[5] == 1) {
+        if (!red_green_corner_solved()) {
+            return false;
+        }
+    }
+    if (flags[6] == 1) {
+        if (!orange_blue_corner_solved()) {
+            return false;
+        }
+    }
+    if (flags[7] == 1) {
+        if (!up_face_solved()) {
+            return false;
+        }
+    }
+    if (flags[8] == 1) {
+        if (!green_orange_edge_solved()) {
+            return false;
+        }
+    }
+    if (flags[9] == 1) {
+        if (!red_green_edge_solved()) {
+            return false;
+        }
+    }
+    if (flags[10] == 1) {
+        if (!orange_blue_edge_solved()) {
+            return false;
+        }
+    }
+    if (flags[11] == 1) {
+        if (!second_layer_solved()) {
+            return false;
+        }
+    }
+    if (flags[12] == 1) {
+        if (!yellow_cross_solved()) {
+            return false;
+        }
+    }
+    if (flags[13] == 1) {
+        if (!yellow_face_solved()) {
+            return false;
+        }
+    }
+    if (flags[14] == 1) {
+        if (!yellow_corners_solved()) {
+            return false;
+        }
+    }
+    return true;
+}
+</declaration>
+    <location id="id0" x="-51" y="-34">
+      <name x="-102" y="17">unsolved</name>
+      <label kind="invariant" x="-68" y="-68">x &lt;= turns</label>
+      <committed/>
+    </location>
+    <location id="id1" x="-518" y="739">
+      <name x="-528" y="705">fully_solved</name>
+    </location>
+    <location id="id2" x="-782" y="76">
+      <name x="-792" y="42">white_cross</name>
+    </location>
+    <location id="id3" x="493" y="76">
+      <name x="485" y="42">limit</name>
+    </location>
+    <location id="id4" x="-782" y="119">
+      <name x="-792" y="85">white_blue</name>
+    </location>
+    <location id="id5" x="-782" y="153">
+      <name x="-792" y="119">white_red</name>
+    </location>
+    <location id="id6" x="-782" y="187">
+      <name x="-792" y="153">white_green</name>
+    </location>
+    <location id="id7" x="-646" y="280">
+      <name x="-656" y="246">red_green_corner</name>
+    </location>
+    <location id="id8" x="-646" y="246">
+      <name x="-656" y="212">green_orange_corner</name>
+    </location>
+    <location id="id9" x="-646" y="314">
+      <name x="-656" y="280">orange_blue_corner</name>
+    </location>
+    <location id="id10" x="-646" y="348">
+      <name x="-656" y="314">white_face</name>
+    </location>
+    <location id="id11" x="-612" y="433">
+      <name x="-622" y="399">green_orange_edge</name>
+    </location>
+    <location id="id12" x="-612" y="467">
+      <name x="-622" y="433">red_green_edge</name>
+    </location>
+    <location id="id13" x="-612" y="501">
+      <name x="-622" y="467">orange_blue_edge</name>
+    </location>
+    <location id="id14" x="-612" y="535">
+      <name x="-622" y="501">second_layer</name>
+    </location>
+    <location id="id15" x="-518" y="629">
+      <name x="-528" y="595">yellow_cross</name>
+    </location>
+    <location id="id16" x="-518" y="663">
+      <name x="-528" y="629">yellow_face</name>
+    </location>
+    <location id="id17" x="-518" y="697">
+      <name x="-528" y="663">yellow_corners</name>
+    </location>
+    <init ref="id0"/>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="850" y="-705">is_allowed_yellow_edge_solve()</label>
+      <label kind="assignment" x="705" y="-748">yellow_edge_solve(false), increase_x(), update_last_move(YELLOW_EDGE_SOLVE)</label>
+      <label kind="comments" x="875" y="-671">yellow edge solve left</label>
+      <nail x="969" y="-799"/>
+      <nail x="986" y="-790"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="850" y="-833">is_allowed_yellow_edge_solve()</label>
+      <label kind="assignment" x="731" y="-824">yellow_edge_solve(true), increase_x(), update_last_move(YELLOW_EDGE_SOLVE)</label>
+      <label kind="comments" x="824" y="-799">yellow edge solve</label>
+      <nail x="909" y="-841"/>
+      <nail x="926" y="-824"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id17"/>
+      <label kind="guard" x="-374" y="544">yellow_corners_solved() &amp;&amp; flags[14] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-246" y="561">flags[14] = 1</label>
+      <nail x="-187" y="518"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="799" y="-884">is_allowed_yellow_corner_solve()</label>
+      <label kind="assignment" x="646" y="-901">yellow_corner_solve(), increase_x(), update_last_move(YELLOW_CORNER_SOLVE)</label>
+      <label kind="comments" x="841" y="-867">yellow corner solve</label>
+      <nail x="858" y="-884"/>
+      <nail x="875" y="-875"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="680" y="-969">is_allowed_yellow_face_solve()</label>
+      <label kind="assignment" x="578" y="-994">yellow_face_solve(), increase_x(), update_last_move(YELLOW_FACE_SOLVE)</label>
+      <label kind="comments" x="705" y="-943">yellow face solve</label>
+      <nail x="723" y="-969"/>
+      <nail x="731" y="-952"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id16"/>
+      <label kind="guard" x="-391" y="518">yellow_face_solved() &amp;&amp; flags[13] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-255" y="535">flags[13] = 1</label>
+      <nail x="-195" y="493"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id15"/>
+      <label kind="guard" x="-399" y="484">yellow_cross_solved() &amp;&amp; flags[12] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-263" y="510">flags[12] = 1</label>
+      <nail x="-204" y="476"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="391" y="-841">is_allowed_yellow_cross_solve()</label>
+      <label kind="assignment" x="263" y="-850">yellow_cross_solve(false), increase_x(), update_last_move(YELLOW_CROSS_SOLVE)</label>
+      <label kind="comments" x="408" y="-824">yellow stripe solve</label>
+      <nail x="510" y="-943"/>
+      <nail x="527" y="-926"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="365" y="-901">is_allowed_yellow_cross_solve()</label>
+      <label kind="assignment" x="212" y="-918">yellow_cross_solve(true), increase_x(), update_last_move(YELLOW_CROSS_SOLVE)</label>
+      <label kind="comments" x="365" y="-875">yellow corner solve</label>
+      <nail x="467" y="-960"/>
+      <nail x="484" y="-952"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id14"/>
+      <label kind="guard" x="-544" y="425">second_layer_solved() &amp;&amp; flags[11] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-433" y="442">flags[11] = 1</label>
+      <nail x="-212" y="382"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id13"/>
+      <label kind="guard" x="-561" y="391">orange_blue_edge_solved() &amp;&amp; flags[10] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-433" y="408">flags[10] = 1</label>
+      <nail x="-221" y="365"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id12"/>
+      <label kind="guard" x="-561" y="365">red_green_edge_solved() &amp;&amp; flags[9] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-416" y="374">flags[9] = 1</label>
+      <nail x="-221" y="340"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id11"/>
+      <label kind="guard" x="-544" y="340">green_orange_edge_solved() &amp;&amp; flags[8] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-399" y="357">flags[8] = 1</label>
+      <nail x="-221" y="323"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="221" y="-883">is_allowed_edge_insert()</label>
+      <label kind="assignment" x="280" y="-1019">edge_insert(false), increase_x(), update_last_move(EDGE_INSERT)</label>
+      <label kind="comments" x="238" y="-858">edge insert left</label>
+      <nail x="365" y="-1019"/>
+      <nail x="391" y="-977"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="178" y="-969">is_allowed_edge_insert()</label>
+      <label kind="assignment" x="127" y="-1054">edge_insert(true), increase_x(), update_last_move(EDGE_INSERT)</label>
+      <label kind="comments" x="170" y="-926">edge insert right</label>
+      <nail x="272" y="-1037"/>
+      <nail x="297" y="-1012"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id10"/>
+      <label kind="guard" x="-510" y="280">up_face_solved() &amp;&amp; flags[7] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-527" y="289">flags[7] = 1</label>
+      <nail x="-178" y="221"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id9"/>
+      <label kind="guard" x="-535" y="246">orange_blue_corner_solved() &amp;&amp; flags[6] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-552" y="255">flags[6] = 1</label>
+      <nail x="-195" y="212"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id7"/>
+      <label kind="guard" x="-527" y="212">red_green_corner_solved() &amp;&amp; flags[5] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-552" y="221">flags[5] = 1</label>
+      <nail x="-221" y="195"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id8"/>
+      <label kind="guard" x="-527" y="187">green_orange_corner_solved() &amp;&amp; flags[4] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-561" y="195">flags[4] = 1</label>
+      <nail x="-238" y="178"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-43" y="-960">is_allowed_corner_insert()</label>
+      <label kind="assignment" x="-1" y="-1079">corner_insert(false), increase_x(), update_last_move(CORNER_INSERT)</label>
+      <label kind="comments" x="-51" y="-909">corner insert left</label>
+      <nail x="76" y="-1079"/>
+      <nail x="101" y="-1062"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-145" y="-1020">is_allowed_corner_insert()</label>
+      <label kind="assignment" x="-60" y="-1079">corner_insert(true), increase_x(), update_last_move(CORNER_INSERT)</label>
+      <label kind="comments" x="-136" y="-994">corner insert right</label>
+      <nail x="34" y="-1071"/>
+      <nail x="42" y="-1062"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id6"/>
+      <label kind="guard" x="-731" y="144">white_green_solved() &amp;&amp; flags[2] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-646" y="127">flags[2] = 1</label>
+      <nail x="-510" y="119"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id5"/>
+      <label kind="guard" x="-722" y="110">white_red_solved() &amp;&amp; flags[1] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-637" y="93">flags[1] = 1</label>
+      <nail x="-535" y="102"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id4"/>
+      <label kind="guard" x="-748" y="76">white_blue_solved() &amp;&amp; flags[0] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-612" y="59">flags[0] = 1</label>
+      <nail x="-561" y="76"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id3"/>
+      <label kind="guard" x="382" y="34">x == turns</label>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id2"/>
+      <label kind="guard" x="-748" y="0">white_cross_solved() &amp;&amp; flags[3] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-595" y="25">flags[3] = 1</label>
+      <nail x="-561" y="51"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-85" y="-705">is_allowed(BACK_PRIME, BACK)</label>
+      <label kind="assignment" x="-110" y="-722">move_back_prime(), update_last_move(BACK_PRIME), increase_x()</label>
+      <label kind="comments" x="-134" y="-493">BACK PRIME</label>
+      <nail x="-59" y="-782"/>
+      <nail x="-42" y="-765"/>
+      <nail x="-51" y="-748"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-289" y="-739">is_allowed(BACK, BACK_PRIME)</label>
+      <label kind="assignment" x="-289" y="-756">move_back(), update_last_move(BACK), increase_x()</label>
+      <label kind="comments" x="-255" y="-535">BACK</label>
+      <nail x="-153" y="-807"/>
+      <nail x="-145" y="-807"/>
+      <nail x="-136" y="-799"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-543" y="-798">is_allowed(FRONT, FRONT_PRIME)</label>
+      <label kind="assignment" x="-706" y="-824">move_front(), update_last_move(FRONT), increase_x()</label>
+      <label kind="comments" x="-477" y="-578">FRONT</label>
+      <nail x="-561" y="-790"/>
+      <nail x="-553" y="-807"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-636" y="-714">is_allowed(FRONT_PRIME, FRONT)</label>
+      <label kind="assignment" x="-713" y="-681">move_front_prime(), update_last_move(FRONT_PRIME), increase_x()</label>
+      <label kind="comments" x="-619" y="-545">FRONT PRIME</label>
+      <nail x="-654" y="-782"/>
+      <nail x="-645" y="-791"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-764" y="-717">is_allowed(LEFT, LEFT_PRIME)</label>
+      <label kind="assignment" x="-764" y="-735">move_left(), update_last_move(LEFT), increase_x()</label>
+      <label kind="comments" x="-637" y="-492">LEFT</label>
+      <nail x="-782" y="-688"/>
+      <nail x="-790" y="-713"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-901" y="-663">is_allowed(LEFT_PRIME, LEFT)</label>
+      <label kind="assignment" x="-901" y="-646">move_left_prime(), update_last_move(LEFT_PRIME), increase_x()</label>
+      <label kind="comments" x="-748" y="-417">LEFT PRIME</label>
+      <nail x="-850" y="-638"/>
+      <nail x="-858" y="-655"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-1122" y="-390">is_allowed(RIGHT_PRIME, RIGHT)</label>
+      <label kind="assignment" x="-1215" y="-373">move_right_prime(), update_last_move(RIGHT_PRIME), increase_x()</label>
+      <label kind="comments" x="-833" y="-314">RIGHT PRIME</label>
+      <nail x="-1036" y="-425"/>
+      <nail x="-1045" y="-399"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-1079" y="-212">is_allowed(RIGHT, RIGHT_PRIME)</label>
+      <label kind="assignment" x="-1155" y="-238">move_right(), update_last_move(RIGHT), increase_x()</label>
+      <label kind="comments" x="-824" y="-196">RIGHT</label>
+      <nail x="-1045" y="-357"/>
+      <nail x="-1045" y="-340"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-1080" y="-484">is_allowed(DOWN_PRIME, DOWN)</label>
+      <label kind="assignment" x="-1071" y="-467">move_down_prime(), update_last_move(DOWN_PRIME),increase_x()</label>
+      <label kind="comments" x="-910" y="-323">DOWN PRIME</label>
+      <nail x="-1003" y="-501"/>
+      <nail x="-986" y="-509"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-1028" y="-569">is_allowed(DOWN, DOWN_PRIME)</label>
+      <label kind="assignment" x="-1019" y="-561">move_down(), update_last_move(DOWN), increase_x()</label>
+      <label kind="comments" x="-765" y="-399">DOWN</label>
+      <nail x="-943" y="-552"/>
+      <nail x="-926" y="-552"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-331" y="-799">is_allowed(UP_PRIME, UP)</label>
+      <label kind="assignment" x="-357" y="-680">move_up_prime(), update_last_move(UP_PRIME), increase_x()</label>
+      <label kind="comments" x="-289" y="-442">UP PRIME</label>
+      <nail x="-306" y="-799"/>
+      <nail x="-306" y="-807"/>
+      <nail x="-289" y="-816"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id0"/>
+      <label kind="guard" x="-425" y="-765">is_allowed(UP, UP_PRIME)</label>
+      <label kind="assignment" x="-493" y="-731">move_up(), update_last_move(UP), increase_x()</label>
+      <label kind="comments" x="-390" y="-468">UP</label>
+      <nail x="-408" y="-816"/>
+      <nail x="-391" y="-824"/>
+    </transition>
+    <transition>
+      <source ref="id0"/>
+      <target ref="id1"/>
+      <label kind="guard" x="-340" y="578">fully_solved_check() &amp;&amp; flags[15] == 0 &amp;&amp; keep_progress()</label>
+      <label kind="assignment" x="-229" y="595">flags[15] = 1</label>
+      <nail x="-178" y="544"/>
+    </transition>
+  </template>
+  <system>// List one or more processes to be composed into a system.
+system Cube;
+    </system>
+  <queries>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).white_blue)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).white_red)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).white_green)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).white_cross)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).green_orange_corner)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).red_green_corner)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).orange_blue_corner)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).white_face)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).green_orange_edge)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).red_green_edge)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).orange_blue_edge)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).second_layer)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).yellow_cross)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).yellow_face)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).yellow_corners)</formula>
+      <comment></comment>
+    </query>
+    <query>
+      <formula>E&lt;&gt; (Cube(0).fully_solved)</formula>
+      <comment></comment>
+    </query>
+  </queries>
+</nta>

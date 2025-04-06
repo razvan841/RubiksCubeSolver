@@ -1,0 +1,7 @@
+numpy==1.25.2
+matplotlib==3.8.2
+dotenv==1.0.1
+ultralytics==8.3.48
+tensorflow==2.18.0
+opencv-python==4.10.0.84
+kociemba==1.2.1

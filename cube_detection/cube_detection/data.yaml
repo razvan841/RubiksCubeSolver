@@ -1,0 +1,13 @@
+train: ../Cube_detection/train/images
+val: ../Cube_detection/valid/images
+test: ../Cube_detection/test/images
+
+nc: 1
+names: ['Rub']
+
+roboflow:
+  workspace: bahrombek-kdb6e
+  project: kub-cainu
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/bahrombek-kdb6e/kub-cainu/dataset/1
